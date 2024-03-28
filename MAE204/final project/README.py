@@ -17,5 +17,3 @@
 #    -------------------------------------------------------
 # It will automatically generate the require csv file and the error plot
 
-import numpy as np
-print(-np.pi/3)
