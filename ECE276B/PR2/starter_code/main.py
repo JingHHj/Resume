@@ -5,6 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import Planner
 from astar import AStar,AStarNode,Environment
+from utils import cells2meters, meters2cells
 
 def tic():
   return time.time()
@@ -95,6 +96,24 @@ def runtest(mapfile, start, goal, verbose = True):
   path = MP.plan(start, goal)
   toc(t0,"Planning")
   
+  # astar
+  t0 = tic()
+  res = 0.5
+  base = boundary[:,:3].reshape(3)
+  blocks[:,:3] = meters2cells(blocks[:,:3],base,res)
+  blocks[:,3:6] = meters2cells(blocks[:,3:6],base,res)
+  boundary[:,:3] = meters2cells(boundary[:,:3],base,res)
+  boundary[:,3:6] = meters2cells(boundary[:,3:6],base,res)
+  goal = meters2cells(goal,base,res)
+  start = meters2cells(start,base,res)
+  print(boundary)
+  print(blocks)
+  
+  env = Environment(blocks,boundary,start,goal)
+  path = AStar.plan(start,env,res)
+  print(path)
+  toc(t0,"Astar")
+  
   # Plot the path
   if verbose:
     ax.plot(path[:,0],path[:,1],path[:,2],'r-')
@@ -102,12 +121,12 @@ def runtest(mapfile, start, goal, verbose = True):
   # TODO: You should verify whether the path actually intersects any of the obstacles in continuous space
   # TODO: You can implement your own algorithm or use an existing library for segment and 
   #       axis-aligned bounding box (AABB) intersection
-  res = 0.1
+  
   
   # meter to cell 
   
-  env = Environment(blocks,boundary,start,goal)
-  traj = AStar.plan(start,env,res)
+  
+  
   
   # cell to meter
   

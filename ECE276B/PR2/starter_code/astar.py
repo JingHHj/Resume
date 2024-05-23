@@ -18,21 +18,19 @@ class AStarNode(object):
     return self.g < other.g     
 
 
+def find_neighbours(node, res):
+  
+  [dX,dY,dZ] = np.meshgrid([-1,0,1],[-1,0,1],[-1,0,1])
+  dR = np.vstack((dX.flatten(),dY.flatten(),dZ.flatten()))
+  dR = np.delete(dR,13,axis=1)
+  dR = dR.T
+  neighbours = np.tile(node,(26,1))
+  
+  return neighbours + dR
+
+
+
 class AStar(object):
-  @staticmethod
-  def find_neighbours(self,node, res):
-    
-    [dX,dY,dZ] = np.meshgrid([-1,0,1],[-1,0,1],[-1,0,1])
-    dR = np.vstack((dX.flatten(),dY.flatten(),dZ.flatten()))
-    dR = np.delete(dR,13,axis=1)
-    dR = dR.T
-    neighbours = np.tile(node,(26,1))
-    
-    return neighbours + dR
-  
-  def relabel():
-    return 
-  
   @staticmethod
   def plan(start_coord, environment,res, epsilon = 1):
     # Initialize the graph and open list
@@ -43,48 +41,56 @@ class AStar(object):
     start = AStarNode(tuple(start_coord), start_coord, environment.getHeuristic(start_coord))
     start.g = 0
     OPEN.additem(tuple(start_coord),start)
-    
+    j = 0
     while len(OPEN) != 0:
+      print(j)
+      j = j + 1
       # core loop
       # pop the item with the lowest f 
       curr = OPEN.popvalue()
-
+      # print(len(OPEN))
       # find its neighbours
-      neighbours = AStar.find_nieghbours(curr.coords,res)
+      neighbours = find_neighbours(curr.coord,res)
       for i in neighbours:
-        pqkey = tuple(i[:3])
-        
-        if pqkey in OPEN:
-          next = OPEN[pqkey]
-        else:
-          next = AStarNode(pqkey,i[:3],environment.getHeuristic(i[:3]))
-        
-        cij = AStar.motion_model(environment,curr.coord,next.coord)
-        # gi+ cij < gj
-        if curr.g + cij < next.g:
-          next.g = curr.g + cij # relabeling
-          next.parent_node = curr # keep on track of the parent node
-          next.parent_action = next.coord - curr.coord
-          OPEN[pqkey] = next
-        else:
+        if environment.if_out(i):
           continue
+        else:
+          pqkey = tuple(i)
+          # print(i)
+          if pqkey in OPEN:
+            next = OPEN[pqkey]
+          else:
+            next = AStarNode(pqkey,i,environment.getHeuristic(i))
           
+            cij = environment.motion_model(curr.coord,next.coord)
+          # gi+ cij < gj
+          if curr.g + cij < next.g:
+            next.g = curr.g + cij # relabeling
+            next.parent_node = curr # keep on track of the parent node
+            next.parent_action = next.coord - curr.coord
+            OPEN[pqkey] = next
+          else:
+            continue
       CLOSED[tuple(curr.coord)] = curr
+      
+      if np.all(curr.coord == environment.goal):
+        print("a* is done")
+        break
+      # if j >= 2000:
+      #   break
       if tuple(environment.goal) in CLOSED:
         break
     
     # trace back to find the trajectory
-    traj = np.copy(environment.goal)
-    while tuple(traj[-1]) != tuple(start_coord):
+    traj = np.copy(environment.goal).reshape(1,3)
+    
+    while np.all(traj[-1] != start_coord):
       last = OPEN[tuple(traj[-1])].parent_node
-      traj = np.vstack((traj,last))s
+      traj = np.vstack((traj,last))
       
     
     return traj
 
-
-  
-  
 
 class Environment(object):
   def __init__(self,blocks,boundary,start,goal):
@@ -113,7 +119,7 @@ class Environment(object):
     return the cost
     """
     cost = math.sqrt(np.sum((curr - next)**2))
-    if Environment.if_out(next):
+    if Environment.if_out(self,next):
       cost = math.inf
     return cost
   
@@ -137,6 +143,10 @@ class Environment(object):
               node[2] >= self.blocks[k,2] and node[2] <= self.blocks[k,5] ):
             out = True
             break
+      # if not out:
+      #   print("block:",self.blocks[:,:6])
+      #   print("boundary:",self.boundary[:,:6])
+      #   print("node:",node)
     return out
     
     
