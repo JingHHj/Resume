@@ -4,8 +4,10 @@ import matplotlib.pyplot as plt; plt.ion()
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import Planner
-from astar import AStar,AStarNode,Environment
+from astar import AStar,Environment
+import utils
 from utils import cells2meters, meters2cells
+from rrt_3d import SamplingBased
 
 def tic():
   return time.time()
@@ -29,7 +31,6 @@ def load_map(fname):
   boundary = mapdata[~blockIdx][['xmin', 'ymin', 'zmin', 'xmax', 'ymax', 'zmax','r','g','b']].view('<f4').reshape(-1,11)[:,2:]
   blocks = mapdata[blockIdx][['xmin', 'ymin', 'zmin', 'xmax', 'ymax', 'zmax','r','g','b']].view('<f4').reshape(-1,11)[:,2:]
   return boundary, blocks
-
 
 def draw_map(boundary, blocks, start, goal):
   '''
@@ -73,7 +74,6 @@ def draw_block_list(ax,blocks):
     h = ax.add_collection3d(pc)
     return h
 
-
 def runtest(mapfile, start, goal, verbose = True):
   '''
   This function:
@@ -86,60 +86,71 @@ def runtest(mapfile, start, goal, verbose = True):
   # Load a map and instantiate a motion planner
   boundary, blocks = load_map(mapfile)
   MP = Planner.MyPlanner(boundary, blocks) # TODO: replace this with your own planner implementation
-  print(boundary.shape)
+  
+
+  collision = False
+  
+  # Call the motion planner
+  
+  # t0 = tic()
+  # path = MP.plan(start, goal)
+  # toc(t0,"Planning")
+  # print(path)
+  
+  # printing info
+  
+  # print("boundary:",boundary)
+  # print("blocks:",blocks)
+  # print("goal:",goal)
+  # print("start:",start)
+  # print("-----------")
+  
+  
+  # astars
+  t0 = tic()
+  env = Environment(blocks,boundary,start,goal,res = 0.5)
+  path = AStar.plan(env)
+  path = cells2meters(path,env.base,env.res)
+  goal = cells2meters(env.goal,env.base,env.res)
+  start = cells2meters(env.start,env.base,env.res)
+  # print(path)
+  # print("blocks:",blocks)
+  toc(t0,"Astar")
+  
+  # RRT
+  # t0 = tic()
+  # path = np.copy(rrt(boundary,blocks,start,goal))
+  # print(path)
+  # toc(t0,"RRT")
+  
   # Display the environment
   if verbose:
     fig, ax, hb, hs, hg = draw_map(boundary, blocks, start, goal)
-
-  # Call the motion planner
-  t0 = tic()
-  path = MP.plan(start, goal)
-  toc(t0,"Planning")
-  
-  # astar
-  t0 = tic()
-  res = 0.5
-  base = boundary[:,:3].reshape(3)
-  blocks[:,:3] = meters2cells(blocks[:,:3],base,res)
-  blocks[:,3:6] = meters2cells(blocks[:,3:6],base,res)
-  boundary[:,:3] = meters2cells(boundary[:,:3],base,res)
-  boundary[:,3:6] = meters2cells(boundary[:,3:6],base,res)
-  goal = meters2cells(goal,base,res)
-  start = meters2cells(start,base,res)
-  print(boundary)
-  print(blocks)
-  
-  env = Environment(blocks,boundary,start,goal)
-  path = AStar.plan(start,env,res)
-  print(path)
-  toc(t0,"Astar")
-  
   # Plot the path
   if verbose:
     ax.plot(path[:,0],path[:,1],path[:,2],'r-')
 
-  # TODO: You should verify whether the path actually intersects any of the obstacles in continuous space
-  # TODO: You can implement your own algorithm or use an existing library for segment and 
-  #       axis-aligned bounding box (AABB) intersection
-  
-  
-  # meter to cell 
-  
-  
-  
-  
-  # cell to meter
-  
   # collision checking
+  collision = utils.check_collision_for_path(path,blocks) # collision checking
+  if collision:
+      print("There is collision")
+  else:
+      print("The trajctory is collision free")
+      
   
-  
-  
-  collision = False
   goal_reached = sum((path[-1]-goal)**2) <= 0.1
   success = (not collision) and goal_reached
   pathlength = np.sum(np.sqrt(np.sum(np.diff(path,axis=0)**2,axis=1)))
   return success, pathlength
 
+
+def rrt(boundary,blocks,start,goal):
+  """ 
+  Implementation of the rrt algorithm
+  """
+  rrt = SamplingBased(boundary,blocks,start,goal)
+  rrt.rrt_plan()
+  return rrt.path
 
 def test_single_cube(verbose = True):
   print('Running single cube test...\n') 
@@ -149,8 +160,7 @@ def test_single_cube(verbose = True):
   print('Success: %r'%success)
   print('Path length: %d'%pathlength)
   print('\n')
-  
-  
+    
 def test_maze(verbose = True):
   print('Running maze test...\n') 
   start = np.array([0.0, 0.0, 1.0])
@@ -159,7 +169,6 @@ def test_maze(verbose = True):
   print('Success: %r'%success)
   print('Path length: %d'%pathlength)
   print('\n')
-
     
 def test_window(verbose = True):
   print('Running window test...\n') 
@@ -169,8 +178,7 @@ def test_window(verbose = True):
   print('Success: %r'%success)
   print('Path length: %d'%pathlength)
   print('\n')
-
-  
+ 
 def test_tower(verbose = True):
   print('Running tower test...\n') 
   start = np.array([2.5, 4.0, 0.5])
@@ -179,8 +187,7 @@ def test_tower(verbose = True):
   print('Success: %r'%success)
   print('Path length: %d'%pathlength)
   print('\n')
-
-     
+    
 def test_flappy_bird(verbose = True):
   print('Running flappy bird test...\n') 
   start = np.array([0.5, 2.5, 5.5])
@@ -189,8 +196,7 @@ def test_flappy_bird(verbose = True):
   print('Success: %r'%success)
   print('Path length: %d'%pathlength) 
   print('\n')
-
-  
+ 
 def test_room(verbose = True):
   print('Running room test...\n') 
   start = np.array([1.0, 5.0, 1.5])
@@ -199,7 +205,6 @@ def test_room(verbose = True):
   print('Success: %r'%success)
   print('Path length: %d'%pathlength)
   print('\n')
-
 
 def test_monza(verbose = True):
   print('Running monza test...\n')
@@ -210,15 +215,14 @@ def test_monza(verbose = True):
   print('Path length: %d'%pathlength)
   print('\n')
 
-
 if __name__=="__main__":
   test_single_cube()
-  # test_maze()
-  # test_flappy_bird()
-  # test_monza()
-  # test_window()
-  # test_tower()
-  # test_room()
+  test_maze()
+  test_flappy_bird()
+  test_monza()
+  test_window()
+  test_tower()
+  test_room()
   plt.show(block=True)
 
 
